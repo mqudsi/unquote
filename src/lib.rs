@@ -51,6 +51,8 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
     let mut iter = s.char_indices().peekable();
 
     while let Some((i, c)) = iter.next() {
+        let next = iter.peek();
+
         let mut maybe_end_range = #[inline(always)]
         || {
             if let Some(start) = range_start {
@@ -60,7 +62,7 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
         };
 
         if c == '\\' {
-            let next = match iter.peek() {
+            let next = match next {
                 None => return Err(TokenizerError {
                         error: ErrorType::TrailingEscape,
                         index: i,
@@ -96,45 +98,61 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
 
         match state {
             State::None => match c {
-                '\'' => state = State::SingleQuoted(i),
-                '"' => state = State::DoubleQuoted(i),
+                '\'' => {
+                    state = State::SingleQuoted(i);
+                    range_start = next.map(|n| n.0);
+                },
+                '"' => {
+                    state = State::DoubleQuoted(i);
+                    range_start = next.map(|n| n.0);
+                },
                 ' ' | '\t' | '\r' | '\n' => continue,
                 _ => {
                     state = State::TokenStarted;
                     range_start = Some(i);
                 }
             },
-            State::DoubleQuoted(_) => {
-                match c {
-                    '"' => {
-                        state = State::TokenStarted;
-                        maybe_end_range();
-                        continue;
-                    }
-                    _ => {}
-                }
-                range_start = range_start.or(Some(i));
-            }
-            State::SingleQuoted(_) => {
-                match c {
-                    '\'' => {
-                        state = State::TokenStarted;
-                        maybe_end_range();
-                        continue;
-                    }
-                    _ => {}
-                }
-                range_start = range_start.or(Some(i));
-            }
             State::TokenStarted => match c {
+                '\'' => {
+                    state = State::SingleQuoted(i);
+                    token_ranges.push(s.get(range_start.unwrap()..i).unwrap());
+                    range_start = next.map(|n| n.0);
+                },
+                '"' => {
+                    state = State::DoubleQuoted(i);
+                    token_ranges.push(s.get(range_start.unwrap()..i).unwrap());
+                    range_start = next.map(|n| n.0);
+                },
                 ' ' | '\t' | '\r' | '\n' => {
-                    maybe_end_range();
+                    token_ranges.push(s.get(range_start.unwrap()..i).unwrap());
                     tokens.push(token_ranges.concat());
                     token_ranges.clear();
                     state = State::None;
                 }
                 _ => {}
             },
+            State::DoubleQuoted(_) => {
+                match c {
+                    '"' => {
+                        state = State::TokenStarted;
+                        maybe_end_range();
+                        range_start = next.map(|n| n.0);
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+            State::SingleQuoted(_) => {
+                match c {
+                    '\'' => {
+                        state = State::TokenStarted;
+                        maybe_end_range();
+                        range_start = next.map(|n| n.0);
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 
@@ -148,7 +166,6 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
                 token_ranges.push(s.get(range_start..).unwrap());
             }
             tokens.push(token_ranges.concat());
-            token_ranges.clear();
             Ok(tokens)
         }
         State::None => {
