@@ -53,9 +53,8 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
     while let Some((i, c)) = iter.next() {
         let mut maybe_end_range = #[inline(always)]
         || {
-            if let Some(start) = range_start {
+            if let Some(start) = range_start.take() {
                 token_ranges.push(s.get(start..i).unwrap());
-                range_start = None;
             }
         };
 
