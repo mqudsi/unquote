@@ -113,12 +113,7 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
             State::None => match c {
                 '\'' => state = State::SingleQuoted(i),
                 '"' => state = State::DoubleQuoted(i),
-                ' ' | '\t' | '\r' | '\n' => {
-                    if !token_ranges.is_empty() {
-                        tokens.push(token_ranges.concat());
-                        token_ranges.clear();
-                    }
-                }
+                ' ' | '\t' | '\r' | '\n' => continue,
                 _ => {
                     state = State::TokenStarted;
                     range_start = Some(i);
@@ -127,7 +122,7 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
             State::DoubleQuoted(_) => {
                 match c {
                     '"' => {
-                        state = State::None;
+                        state = State::TokenStarted;
                         maybe_end_range();
                         continue;
                     }
@@ -138,7 +133,7 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
             State::SingleQuoted(_) => {
                 match c {
                     '\'' => {
-                        state = State::None;
+                        state = State::TokenStarted;
                         maybe_end_range();
                         continue;
                     }
@@ -164,7 +159,9 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
             index: q,
         }),
         State::TokenStarted => {
-            token_ranges.push(s.get(range_start.unwrap()..).unwrap());
+            if let Some(range_start) = range_start {
+                token_ranges.push(s.get(range_start..).unwrap());
+            }
             tokens.push(token_ranges.concat());
             token_ranges.clear();
             Ok(tokens)
