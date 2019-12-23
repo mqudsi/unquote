@@ -60,10 +60,12 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
 
         if c == '\\' {
             let next = match iter.peek() {
-                None => return Err(TokenizerError {
+                None => {
+                    return Err(TokenizerError {
                         error: ErrorType::TrailingEscape,
                         index: i,
-                    }),
+                    })
+                }
                 Some(next) => next,
             };
 
@@ -79,10 +81,12 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
                 (_, 't') => push = Some("\t"),
                 (_, 'n') => push = Some("\n"),
                 (_, 'r') => push = Some("\r"),
-                _ => return Err(TokenizerError {
-                    error: ErrorType::InvalidEscape,
-                    index: next.0,
-                })
+                _ => {
+                    return Err(TokenizerError {
+                        error: ErrorType::InvalidEscape,
+                        index: next.0,
+                    })
+                }
             }
 
             if let Some(push) = push {
@@ -98,11 +102,11 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
                 '\'' => {
                     state = State::SingleQuoted(i);
                     range_start = iter.peek().map(|n| n.0);
-                },
+                }
                 '"' => {
                     state = State::DoubleQuoted(i);
                     range_start = iter.peek().map(|n| n.0);
-                },
+                }
                 ' ' | '\t' | '\r' | '\n' => continue,
                 _ => {
                     state = State::TokenStarted;
@@ -114,12 +118,12 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
                     state = State::SingleQuoted(i);
                     token_ranges.push(s.get(range_start.unwrap()..i).unwrap());
                     range_start = iter.peek().map(|n| n.0);
-                },
+                }
                 '"' => {
                     state = State::DoubleQuoted(i);
                     token_ranges.push(s.get(range_start.unwrap()..i).unwrap());
                     range_start = iter.peek().map(|n| n.0);
-                },
+                }
                 ' ' | '\t' | '\r' | '\n' => {
                     token_ranges.push(s.get(range_start.unwrap()..i).unwrap());
                     tokens.push(token_ranges.concat());
@@ -128,28 +132,24 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
                 }
                 _ => {}
             },
-            State::DoubleQuoted(_) => {
-                match c {
-                    '"' => {
-                        state = State::TokenStarted;
-                        maybe_end_range();
-                        range_start = iter.peek().map(|n| n.0);
-                        continue;
-                    }
-                    _ => {}
+            State::DoubleQuoted(_) => match c {
+                '"' => {
+                    state = State::TokenStarted;
+                    maybe_end_range();
+                    range_start = iter.peek().map(|n| n.0);
+                    continue;
                 }
-            }
-            State::SingleQuoted(_) => {
-                match c {
-                    '\'' => {
-                        state = State::TokenStarted;
-                        maybe_end_range();
-                        range_start = iter.peek().map(|n| n.0);
-                        continue;
-                    }
-                    _ => {}
+                _ => {}
+            },
+            State::SingleQuoted(_) => match c {
+                '\'' => {
+                    state = State::TokenStarted;
+                    maybe_end_range();
+                    range_start = iter.peek().map(|n| n.0);
+                    continue;
                 }
-            }
+                _ => {}
+            },
         }
     }
 
