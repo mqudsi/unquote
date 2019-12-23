@@ -82,3 +82,43 @@ pub fn interpolated_double_quoted() {
         Ok(vec!["hello friend bob".into()])
     );
 }
+
+#[test]
+pub fn leading_whitespace() {
+    assert_eq!(
+        tokenize(" hello"),
+        Ok(vec!["hello".into()])
+    );
+}
+
+#[test]
+pub fn trailing_whitespace() {
+    assert_eq!(
+        tokenize("hello "),
+        Ok(vec!["hello".into()])
+    );
+}
+
+#[test]
+pub fn interword_whitespace() {
+    assert_eq!(
+        tokenize("hello  world"),
+        Ok(vec!["hello".into(), "world".into()])
+    );
+}
+
+#[test]
+pub fn only_whitespace() {
+    assert_eq!(
+        tokenize("   "),
+        Ok(vec![])
+    );
+}
+
+#[test]
+pub fn empty_quotes() {
+    assert_eq!(
+        tokenize("\"\""),
+        Ok(vec!["".into()])
+    );
+}
