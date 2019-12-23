@@ -1,5 +1,4 @@
 #![allow(incomplete_features)]
-#![allow(dead_code)]
 #![feature(const_generics)]
 #![feature(or_patterns)]
 #![feature(stmt_expr_attributes)]
@@ -25,20 +24,6 @@ pub enum ErrorType {
     InvalidEscape,
 }
 
-#[derive(PartialEq)]
-pub enum Until {
-    Quote,
-    DoubleQuote,
-}
-
-#[derive(PartialEq)]
-enum Skip {
-    None,
-    Any,
-    Until(char),
-}
-
-type TokenStart = usize;
 type QuoteStart = usize;
 #[derive(Clone, Copy, Debug)]
 enum State {
