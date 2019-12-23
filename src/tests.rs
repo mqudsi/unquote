@@ -1,3 +1,5 @@
+use crate::tokenize;
+
 #[test]
 pub fn one_word() {
     assert_eq!(tokenize("hello"), Ok(vec!["hello".into()]));

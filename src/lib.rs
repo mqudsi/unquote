@@ -1,10 +1,10 @@
 #![allow(incomplete_features)]
 #![allow(dead_code)]
 #![feature(const_generics)]
+#![feature(or_patterns)]
 #![feature(stmt_expr_attributes)]
-// #![feature(or_patterns)]
 
-#[test]
+#[cfg(test)]
 mod tests;
 
 #[derive(Debug, PartialEq)]
@@ -21,6 +21,8 @@ pub enum ErrorType {
     UnbalancedQuotes,
     /// Unable to parse input as valid UTF-8 string
     Utf8Error,
+    /// Invalid escape
+    InvalidEscape,
 }
 
 #[derive(PartialEq)]
@@ -38,6 +40,7 @@ enum Skip {
 
 type TokenStart = usize;
 type QuoteStart = usize;
+#[derive(Clone, Copy, Debug)]
 enum State {
     None,
     /// Within a token
@@ -46,8 +49,6 @@ enum State {
     DoubleQuoted(QuoteStart),
     /// Within a single quote
     SingleQuoted(QuoteStart),
-    // /// After a single-character escape
-    // Escaped,
 }
 
 pub enum TokenType<'a> {
@@ -73,27 +74,43 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
             }
         };
 
+        if c == '\\' {
+            let next = match iter.peek() {
+                None => return Err(TokenizerError {
+                        error: ErrorType::TrailingEscape,
+                        index: i,
+                    }),
+                Some(next) => next,
+            };
+
+            let push;
+            match (state, next.1) {
+                (_, '\\') => push = Some("\\"),
+                // Within single quotes, only an escaped backslash or single quote is allowed
+                (State::None, '\'') | (State::SingleQuoted(_), '\'') => push = Some("'"),
+                // Otherwise, single quotes imply "raw" text, including backslashes
+                (State::SingleQuoted(_), _) => push = None,
+                (State::None, '\"') | (State::DoubleQuoted(_), '\"') => push = Some("\""),
+                // These are valid both within double quotes and in unquoted text
+                (_, 't') => push = Some("\t"),
+                (_, 'n') => push = Some("\n"),
+                (_, 'r') => push = Some("\r"),
+                _ => return Err(TokenizerError {
+                    error: ErrorType::InvalidEscape,
+                    index: next.0,
+                })
+            }
+
+            if let Some(push) = push {
+                maybe_end_range();
+                tokens.push(push.to_owned());
+                iter.next();
+                continue;
+            }
+        }
+
         match state {
             State::None => match c {
-                '\\' => {
-                    state = State::TokenStarted;
-                    match iter.peek() {
-                        Some((n_i, n_c)) => match n_c {
-                            '\\' | '"' | '\'' => {
-                                range_start = Some(*n_i);
-                                iter.next();
-                                continue;
-                            }
-                            _ => {}
-                        },
-                        None => {
-                            return Err(TokenizerError {
-                                error: ErrorType::TrailingEscape,
-                                index: i,
-                            })
-                        }
-                    }
-                }
                 '\'' => state = State::SingleQuoted(i),
                 '"' => state = State::DoubleQuoted(i),
                 ' ' | '\t' | '\r' | '\n' => {
@@ -114,14 +131,6 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
                         maybe_end_range();
                         continue;
                     }
-                    '\\' => match iter.peek() {
-                        Some((n_i, '\\')) | Some((n_i, '"')) => {
-                            maybe_end_range();
-                            range_start = Some(*n_i);
-                            iter.next();
-                        }
-                        _ => {}
-                    },
                     _ => {}
                 }
                 range_start = range_start.or(Some(i));
@@ -133,38 +142,11 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
                         maybe_end_range();
                         continue;
                     }
-                    '\\' => match iter.peek() {
-                        Some((n_i, n_c)) => match n_c {
-                            '\\' | '\'' => {
-                                maybe_end_range();
-                                range_start = Some(*n_i);
-                            }
-                            _ => {}
-                        },
-                        _ => {}
-                    },
                     _ => {}
                 }
                 range_start = range_start.or(Some(i));
             }
             State::TokenStarted => match c {
-                '\\' => match iter.peek() {
-                    Some((n_i, n_c)) => match n_c {
-                        '\\' | '"' | '\'' => {
-                            maybe_end_range();
-                            range_start = Some(*n_i);
-                            iter.next();
-                            continue;
-                        }
-                        _ => {}
-                    },
-                    None => {
-                        return Err(TokenizerError {
-                            error: ErrorType::TrailingEscape,
-                            index: i,
-                        })
-                    }
-                },
                 ' ' | '\t' | '\r' | '\n' => {
                     maybe_end_range();
                     tokens.push(token_ranges.concat());
