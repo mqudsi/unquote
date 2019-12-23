@@ -51,8 +51,6 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
     let mut iter = s.char_indices().peekable();
 
     while let Some((i, c)) = iter.next() {
-        let next = iter.peek();
-
         let mut maybe_end_range = #[inline(always)]
         || {
             if let Some(start) = range_start {
@@ -62,7 +60,7 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
         };
 
         if c == '\\' {
-            let next = match next {
+            let next = match iter.peek() {
                 None => return Err(TokenizerError {
                         error: ErrorType::TrailingEscape,
                         index: i,
@@ -100,11 +98,11 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
             State::None => match c {
                 '\'' => {
                     state = State::SingleQuoted(i);
-                    range_start = next.map(|n| n.0);
+                    range_start = iter.peek().map(|n| n.0);
                 },
                 '"' => {
                     state = State::DoubleQuoted(i);
-                    range_start = next.map(|n| n.0);
+                    range_start = iter.peek().map(|n| n.0);
                 },
                 ' ' | '\t' | '\r' | '\n' => continue,
                 _ => {
@@ -116,12 +114,12 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
                 '\'' => {
                     state = State::SingleQuoted(i);
                     token_ranges.push(s.get(range_start.unwrap()..i).unwrap());
-                    range_start = next.map(|n| n.0);
+                    range_start = iter.peek().map(|n| n.0);
                 },
                 '"' => {
                     state = State::DoubleQuoted(i);
                     token_ranges.push(s.get(range_start.unwrap()..i).unwrap());
-                    range_start = next.map(|n| n.0);
+                    range_start = iter.peek().map(|n| n.0);
                 },
                 ' ' | '\t' | '\r' | '\n' => {
                     token_ranges.push(s.get(range_start.unwrap()..i).unwrap());
@@ -136,7 +134,7 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
                     '"' => {
                         state = State::TokenStarted;
                         maybe_end_range();
-                        range_start = next.map(|n| n.0);
+                        range_start = iter.peek().map(|n| n.0);
                         continue;
                     }
                     _ => {}
@@ -147,7 +145,7 @@ pub fn tokenize<'a>(s: &'a str) -> Result<Vec<String>, TokenizerError> {
                     '\'' => {
                         state = State::TokenStarted;
                         maybe_end_range();
-                        range_start = next.map(|n| n.0);
+                        range_start = iter.peek().map(|n| n.0);
                         continue;
                     }
                     _ => {}
