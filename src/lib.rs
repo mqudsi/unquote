@@ -1,6 +1,4 @@
 #![allow(incomplete_features)]
-#![feature(const_generics)]
-#![feature(or_patterns)]
 #![feature(stmt_expr_attributes)]
 
 #[cfg(test)]
